@@ -25,8 +25,16 @@ jobs:
     - name: Build
       run: npm run build
 
-    - name: Run Unit Tests
+    - name: Run Unit Tests & Coverage Check
       run: npm run test:cov
 
     - name: Run BDD Tests
       run: npx jest test/step-definitions/update-status.steps.spec.ts --rootDir .
+
+    # Example of SonarQube/SonarCloud integration
+    # - name: SonarCloud Scan
+    #   uses: SonarSource/sonarcloud-github-action@master
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
