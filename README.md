@@ -73,7 +73,21 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-### Executar
+### Executar com Docker (Recomendado)
+O projeto está configurado com Docker Compose para subir a aplicação e o banco de dados automaticamente.
+
+```bash
+# Subir aplicação e banco de dados
+docker compose up --build
+```
+Isso irá:
+1.  Criar o container do PostgreSQL.
+2.  Criar o container da aplicação.
+3.  Rodar as migrations automaticamente.
+4.  Rodar os seeds (dados iniciais).
+5.  Disponibilizar a API em `http://localhost:8080/api`.
+
+### Executar Manualmente (Local)
 ```bash
 # Desenvolvimento
 npm run start:dev
