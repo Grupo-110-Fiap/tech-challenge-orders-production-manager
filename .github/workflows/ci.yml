@@ -31,10 +31,9 @@ jobs:
     - name: Run BDD Tests
       run: npx jest test/step-definitions/update-status.steps.spec.ts --rootDir .
 
-    # Example of SonarQube/SonarCloud integration
-    # - name: SonarCloud Scan
-    #   uses: SonarSource/sonarcloud-github-action@master
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@v5.0.0
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
