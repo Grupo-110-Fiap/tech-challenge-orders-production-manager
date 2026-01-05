@@ -33,7 +33,7 @@ jobs:
 
 
     - name: SonarCloud Scan
-      uses: SonarSource/sonarqube-scan-action@v5.0.0
+      uses: SonarSource/sonarqube-scan-action@0303d6b1d16c527f311ebc5a9359e19e7a256a4b # v5.0.0
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
