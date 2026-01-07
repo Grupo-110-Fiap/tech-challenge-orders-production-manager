@@ -139,6 +139,135 @@ describe('SqsConsumerService', () => {
       expect(productionService.receiveOrder).toHaveBeenCalled();
       expect(sqsMock.calls()).toHaveLength(0); // Delete NOT called
     });
+
+    it('should log warning and return if message has no body', async () => {
+      const message = {
+        MessageId: 'msg-no-body',
+        ReceiptHandle: 'handle-no-body',
+      };
+
+      const loggerSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await (service as any).handleMessage(message);
+
+      expect(loggerSpy).toHaveBeenCalledWith(`Message msg-no-body has no body`);
+      expect(productionService.receiveOrder).not.toHaveBeenCalled();
+    });
+
+    it('should use payload.Message as DTO if it is not a JSON string (SNS raw)', async () => {
+      const innerMessageObj = {
+        externalOrderId: 'ORDER-RAW',
+        items: [{ name: 'Fries', quantity: 1 }],
+      };
+      // Payload.Message is an object, not a string
+      const body = JSON.stringify({
+        Type: 'Notification',
+        Message: innerMessageObj,
+      });
+
+      const message = {
+        MessageId: 'msg-raw-sns',
+        ReceiptHandle: 'handle-raw-sns',
+        Body: body,
+      };
+
+      sqsMock.on(DeleteMessageCommand).resolves({});
+      (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
+
+      await (service as any).handleMessage(message);
+
+      expect(productionService.receiveOrder).toHaveBeenCalledWith(innerMessageObj);
+      expect(sqsMock.calls()).toHaveLength(1);
+    });
+  });
+
+  describe('Initialization & Polling', () => {
+    it('should NOT start polling if credentials are missing', async () => {
+      const moduleVal: TestingModule = await Test.createTestingModule({
+        providers: [
+          SqsConsumerService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn(() => null), // Return null for everything
+            },
+          },
+          { provide: ProductionService, useValue: { receiveOrder: jest.fn() } },
+        ],
+      }).compile();
+
+      const serviceNoConfig =
+        moduleVal.get<SqsConsumerService>(SqsConsumerService);
+
+      // We can't spy on logger here because constructor already ran
+      // But we can verify sqsClient is undefined
+      expect((serviceNoConfig as any).sqsClient).toBeUndefined();
+
+      // onModuleInit shouldn't do anything
+      serviceNoConfig.onModuleInit();
+      expect((serviceNoConfig as any).isPolling).toBe(false);
+    });
+
+    it('should start polling on init and process messages', async () => {
+      jest.useFakeTimers();
+      const message = {
+        MessageId: 'msg-poll',
+        ReceiptHandle: 'handle-poll',
+        Body: JSON.stringify({ externalOrderId: 'POLL' }),
+      };
+
+      // Mock SQS to return a message once, then stop polling
+      sqsMock.on(ReceiveMessageCommand).callsFake(async () => {
+        // Stop polling after this call to break the loop
+        (service as any).isPolling = false;
+        return { Messages: [message] };
+      });
+
+      sqsMock.on(DeleteMessageCommand).resolves({});
+      (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
+
+      // Start
+      service.onModuleInit();
+
+      // Fast-forward timers to handle potential waits (though our mock returns immediately)
+      // pollMessages is async, so we need to wait for the promise loop to handle the message
+      await jest.runAllTimersAsync();
+
+      expect(productionService.receiveOrder).toHaveBeenCalled();
+      expect(sqsMock.commandCalls(ReceiveMessageCommand).length).toBeGreaterThan(
+        0,
+      );
+      jest.useRealTimers();
+    });
+
+    it('should handle polling errors gracefully (retry wait)', async () => {
+      jest.useFakeTimers();
+      const loggerSpy = jest.spyOn((service as any).logger, 'error');
+
+      // First call throws error
+      // Second call stops polling
+      let callCount = 0;
+      sqsMock.on(ReceiveMessageCommand).callsFake(async () => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error('SQS Error');
+        }
+        (service as any).isPolling = false;
+        return { Messages: [] };
+      });
+
+      service.onModuleInit(); // Starts loop
+
+      // Advance timers to cover the "wait after error" (5000ms)
+      await jest.advanceTimersByTimeAsync(6000);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Error polling messages from SQS',
+        expect.any(Error),
+      );
+      expect(callCount).toBeGreaterThanOrEqual(2);
+      jest.useRealTimers();
+    });
   });
 
   describe('Graceful Shutdown', () => {
@@ -165,6 +294,29 @@ describe('SqsConsumerService', () => {
 
       expect((service as any).activeMessages).toBe(0);
       expect((service as any).isPolling).toBe(false);
+    });
+
+    it('should timeout and force shutdown if messages take too long', async () => {
+      (service as any).activeMessages = 1;
+      const loggerSpy = jest.spyOn((service as any).logger, 'warn');
+
+      // Reduce loop iterations for test to make it faster if possible,
+      // but loop logic uses constant 'maxRetries = 10' and '1000' ms wait.
+      // Total wait = 10s.
+      // Jest fake timers can help.
+      jest.useFakeTimers();
+
+      const shutdownPromise = service.beforeApplicationShutdown('SIGTERM');
+
+      // Fast forward past the 10 retries * 1000ms
+      await jest.advanceTimersByTimeAsync(11000);
+
+      await shutdownPromise;
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Forced shutdown with 1 active messages')
+      );
+      jest.useRealTimers();
     });
   });
 });
