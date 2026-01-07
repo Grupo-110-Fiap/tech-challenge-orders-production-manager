@@ -265,6 +265,9 @@ describe('SqsConsumerService', () => {
         'Error polling messages from SQS',
         expect.any(Error),
       );
+      // Ensure we stop polling so the loop terminates cleanly
+      (service as any).isPolling = false;
+
       expect(callCount).toBeGreaterThanOrEqual(2);
       jest.useRealTimers();
     });
