@@ -8,5 +8,6 @@ import { ProductionController } from './production.controller';
   imports: [SequelizeModule.forFeature([ProductionOrder])],
   providers: [ProductionService],
   controllers: [ProductionController],
+  exports: [ProductionService],
 })
 export class ProductionModule { }

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { ProductionOrder, ProductionStatus } from './production-order.model';
+import { CreateProductionOrderDto } from './dto/create-production-order.dto';
 
 @Injectable()
 export class ProductionService {
@@ -8,6 +9,23 @@ export class ProductionService {
     @InjectModel(ProductionOrder)
     private productionOrderModel: typeof ProductionOrder,
   ) { }
+
+  async receiveOrder(dto: CreateProductionOrderDto): Promise<ProductionOrder> {
+    const existingOrder = await this.productionOrderModel.findOne({
+      where: { externalOrderId: dto.externalOrderId },
+    });
+
+    if (existingOrder) {
+      // Idempotency: if order already exists, just return it (or ignore)
+      return existingOrder;
+    }
+
+    return this.productionOrderModel.create({
+      externalOrderId: dto.externalOrderId,
+      items: dto.items,
+      status: ProductionStatus.RECEIVED,
+    });
+  }
 
   async listPendingOrders(): Promise<ProductionOrder[]> {
     return this.productionOrderModel.findAll({
