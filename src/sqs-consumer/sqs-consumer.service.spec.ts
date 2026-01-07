@@ -256,7 +256,7 @@ describe('SqsConsumerService', () => {
         return { Messages: [] };
       });
 
-      service.onModuleInit(); // Starts loop
+      const pollPromise = service.onModuleInit(); // Starts loop
 
       // Advance timers to cover the "wait after error" (5000ms)
       await jest.advanceTimersByTimeAsync(6000);
@@ -267,6 +267,9 @@ describe('SqsConsumerService', () => {
       );
       // Ensure we stop polling so the loop terminates cleanly
       (service as any).isPolling = false;
+
+      // Wait for loop to finish
+      await pollPromise;
 
       expect(callCount).toBeGreaterThanOrEqual(2);
       jest.useRealTimers();

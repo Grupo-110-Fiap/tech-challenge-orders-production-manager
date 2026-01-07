@@ -53,7 +53,7 @@ export class SqsConsumerService
   onModuleInit() {
     if (this.sqsClient) {
       this.isPolling = true;
-      this.pollMessages();
+      return this.pollMessages();
     }
   }
 

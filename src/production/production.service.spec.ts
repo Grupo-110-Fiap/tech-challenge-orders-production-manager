@@ -21,6 +21,7 @@ describe('ProductionService', () => {
   let service: ProductionService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductionService,
