@@ -18,7 +18,8 @@ module.exports = {
     "/src/main.ts",
     "/src/app.module.ts",
     "/src/database/",
-    ".module.ts"
+    ".module.ts",
+    ".dto.ts"
   ],
   coverageDirectory: "../coverage",
   testEnvironment: "node",

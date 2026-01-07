@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ProductionModule } from './production/production.module';
+import { SqsConsumerModule } from './sqs-consumer/sqs-consumer.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ProductionModule } from './production/production.module';
       inject: [ConfigService],
     }),
     ProductionModule,
+    ...(process.env.APP_MODE === 'WORKER' ? [SqsConsumerModule] : []),
   ],
   controllers: [],
   providers: [],
