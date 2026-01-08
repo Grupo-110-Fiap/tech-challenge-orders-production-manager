@@ -11,4 +11,3 @@ data:
   DB_USERNAME: "fiap_arch"
   DB_SSL: "true"
   AWS_SNS_TOPIC_NAME: "order-upsert-events-dev"
-  AWS_SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/499243079593/production-queue"
