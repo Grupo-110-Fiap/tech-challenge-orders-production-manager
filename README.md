@@ -69,8 +69,8 @@ A aplicação possui dois modos de execução controlados pela variável `APP_MO
 | `DB_PORT` | Porta do banco | `5432` |
 | `DB_DATABASE` | Nome da base | `production_db` |
 | `DB_SSL` | Habilitar SSL (Obrigatório RDS) | `true` |
-| `AWS_SQS_QUEUE_URL`| URL da fila SQS | `https://sqs...` |
-| `AWS_SNS_TOPIC_NAME`| Nome do tópico SNS | `order-upsert-events-dev` |
+| `AWS_SQS_QUEUE_URL`| URL da fila SQS | `.../order-upsert-events-dev` |
+| `AWS_SNS_TOPIC_ARN`| ARN do tópico SNS | `arn:aws:sns:us-east-1...` |
 
 ### Execução Local (Sem Docker)
 1.  **Instalação**: `npm install`

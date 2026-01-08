@@ -10,4 +10,3 @@ data:
   DB_DATABASE: "production_manager_db"
   DB_USERNAME: "fiap_arch"
   DB_SSL: "true"
-  AWS_SNS_TOPIC_NAME: "order-upsert-events-dev"
