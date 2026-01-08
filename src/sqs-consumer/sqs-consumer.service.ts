@@ -141,14 +141,25 @@ export class SqsConsumerService
           return;
         }
 
+        let rawOrder: any = null;
         if (payload.Type === 'Notification' && payload.Message) {
           try {
-            orderDto = JSON.parse(payload.Message);
+            rawOrder = JSON.parse(payload.Message);
           } catch (e) {
-            orderDto = payload.Message;
+            rawOrder = payload.Message;
           }
         } else {
-          orderDto = payload;
+          rawOrder = payload;
+        }
+
+        if (rawOrder && rawOrder.id && rawOrder.items) {
+          orderDto = {
+            externalOrderId: rawOrder.id,
+            items: rawOrder.items,
+          };
+        } else {
+          // Fallback or legacy support if id/items are not in the new format
+          orderDto = rawOrder;
         }
       }
 

@@ -52,8 +52,8 @@ describe('SqsConsumerService', () => {
   describe('handleMessage', () => {
     it('should parse valid JSON message and process order', async () => {
       const messageBody = JSON.stringify({
-        externalOrderId: 'ORDER-123',
-        items: [{ name: 'Burger', quantity: 1 }],
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        items: [{ product_id: 'prod_abc', quantity: 2, price: 50.00 }],
       });
       const message = {
         MessageId: 'msg-1',
@@ -73,8 +73,8 @@ describe('SqsConsumerService', () => {
       await (service as any).handleMessage(message);
 
       expect(productionService.receiveOrder).toHaveBeenCalledWith({
-        externalOrderId: 'ORDER-123',
-        items: [{ name: 'Burger', quantity: 1 }],
+        externalOrderId: '550e8400-e29b-41d4-a716-446655440000',
+        items: [{ product_id: 'prod_abc', quantity: 2, price: 50.00 }],
       });
 
       expect(sqsMock.calls()).toHaveLength(1);
@@ -85,8 +85,8 @@ describe('SqsConsumerService', () => {
 
     it('should parse SNS notification wrapped message', async () => {
       const innerMessage = JSON.stringify({
-        externalOrderId: 'ORDER-SNS',
-        items: [{ name: 'Pizza', quantity: 2 }],
+        id: 'ORDER-SNS',
+        items: [{ product_id: 'pizza_123', quantity: 2, price: 30.00 }],
       });
       const body = JSON.stringify({
         Type: 'Notification',
@@ -106,7 +106,7 @@ describe('SqsConsumerService', () => {
 
       expect(productionService.receiveOrder).toHaveBeenCalledWith({
         externalOrderId: 'ORDER-SNS',
-        items: [{ name: 'Pizza', quantity: 2 }],
+        items: [{ product_id: 'pizza_123', quantity: 2, price: 30.00 }],
       });
 
       expect(sqsMock.calls()).toHaveLength(1); // Delete called
@@ -156,8 +156,8 @@ describe('SqsConsumerService', () => {
 
     it('should use payload.Message as DTO if it is not a JSON string (SNS raw)', async () => {
       const innerMessageObj = {
-        externalOrderId: 'ORDER-RAW',
-        items: [{ name: 'Fries', quantity: 1 }],
+        id: 'ORDER-RAW',
+        items: [{ product_id: 'fries_1', quantity: 1, price: 10.00 }],
       };
       // Payload.Message is an object, not a string
       const body = JSON.stringify({
@@ -176,7 +176,10 @@ describe('SqsConsumerService', () => {
 
       await (service as any).handleMessage(message);
 
-      expect(productionService.receiveOrder).toHaveBeenCalledWith(innerMessageObj);
+      expect(productionService.receiveOrder).toHaveBeenCalledWith({
+        externalOrderId: 'ORDER-RAW',
+        items: [{ product_id: 'fries_1', quantity: 1, price: 10.00 }],
+      });
       expect(sqsMock.calls()).toHaveLength(1);
     });
   });
