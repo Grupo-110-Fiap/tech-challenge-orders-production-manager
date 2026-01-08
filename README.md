@@ -89,7 +89,9 @@ Os manifestos de infraestrutura estão em `infra/k8s/`. O deploy é automatizado
 
 ## 🧪 Testes e Qualidade
 
-Monitoramos a qualidade via SonarCloud com os seguintes comandos:
+Monitoramos a qualidade via SonarCloud e testes automatizados. Abaixo a evidência de cobertura atual:
+
+![Evidência de Cobertura de Testes](docs/images/coverage.png)
 
 ```bash
 # Testes Unitários e Cobertura
