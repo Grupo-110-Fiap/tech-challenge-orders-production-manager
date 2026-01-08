@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: production-manager-svc
+  namespace: production
+  labels:
+    app: production-manager
+spec:
+  type: LoadBalancer
+  selector:
+    app: production-manager
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

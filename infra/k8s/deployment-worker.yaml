@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: production-manager-worker
+  namespace: production
+  labels:
+    app: production-manager-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: production-manager-worker
+  template:
+    metadata:
+      labels:
+        app: production-manager-worker
+    spec:
+      containers:
+        - name: production-manager-worker
+          image: IMAGE_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          env:
+            - name: APP_MODE
+              value: "WORKER"
+          envFrom:
+            - configMapRef:
+                name: production-manager-config
+            - secretRef:
+                name: production-manager-secret
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"

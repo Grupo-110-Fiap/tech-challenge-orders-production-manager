@@ -6,6 +6,11 @@ on:
   push:
     branches: [ main ]
 
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: production-manager
+  EKS_CLUSTER_NAME: tech-challenge-cluster
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -70,4 +75,116 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  build-and-push:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: order-manager-environments
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    environment: order-manager-environments
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Deploy to EKS and verify deployment
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SQS_QUEUE_URL: ${{ vars.AWS_SQS_QUEUE_URL }} # Using vars for non-secret URL, or secrets if prefered
+        run: |
+          IMAGE_TAG=$(echo "${{ needs.build-and-push.outputs.image-tag }}" | tail -n 1)
+          echo "Deploying with image: $IMAGE_TAG"
+
+          # Replace image tag placeholder
+          sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" infra/k8s/deployment.yaml
+
+          # Substitute secrets in secret.yaml
+          # We use envsubst to replace ${VAR} with environment variable values
+          envsubst < infra/k8s/secret.yaml > infra/k8s/secret-filled.yaml
+
+          # Deploy application resources in order
+          kubectl apply -f infra/k8s/configmap.yaml
+          kubectl apply -f infra/k8s/secret-filled.yaml
+          kubectl apply -f infra/k8s/deployment.yaml
+          kubectl apply -f infra/k8s/service.yaml
+
+          echo "Waiting for deployment to complete..."
+          kubectl rollout status deployment/production-manager -n production --timeout=600s
+
+          echo "Deployment successful! Getting service info..."
+          kubectl get service production-manager-svc -n production
+
+          # Deploy Worker
+          echo "Deploying Worker..."
+          sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" infra/k8s/deployment-worker.yaml
+          kubectl apply -f infra/k8s/deployment-worker.yaml
+          
+          echo "Waiting for worker deployment to complete..."
+          kubectl rollout status deployment/production-manager-worker -n production --timeout=600s
+
+          echo "📊 Final deployment status:"
+          kubectl get all -n production
+          kubectl get ingress -n production || true
 
