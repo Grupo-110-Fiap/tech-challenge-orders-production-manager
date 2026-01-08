@@ -21,6 +21,12 @@ import { HealthModule } from './health/health.module';
         database: configService.get<string>('DB_DATABASE'),
         autoLoadModels: true,
         synchronize: true,
+        dialectOptions: configService.get<string>('DB_SSL') === 'true' ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false, // Set to true if you have the CA cert
+          },
+        } : {},
       }),
       inject: [ConfigService],
     }),
