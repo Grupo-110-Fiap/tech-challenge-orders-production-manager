@@ -146,6 +146,7 @@ jobs:
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          aws eks get-token --cluster-name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} | head -n 5
 
       - name: Deploy to EKS and verify deployment
         env:
