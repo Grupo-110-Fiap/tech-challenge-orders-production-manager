@@ -9,4 +9,4 @@ data:
   DB_HOST: "production-manager-prod-postgres.c0hcysmoeeet.us-east-1.rds.amazonaws.com"
   DB_DATABASE: "production_manager_db"
   DB_USERNAME: "fiap_arch"
-  DB_SSL: "false"
+  DB_SSL: "true"
