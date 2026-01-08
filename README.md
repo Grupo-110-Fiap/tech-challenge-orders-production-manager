@@ -12,7 +12,7 @@ Microsserviço responsável pelo gerenciamento da fila de produção da cozinha 
 *   **Container Registry**: Amazon ECR
 *   **Qualidade**: SonarCloud & BDD (Cucumber)
 
-## �️ Contexto de Negócio e Modelagem
+## 📚 Contexto de Negócio e Modelagem
 
 O sistema gerencia o ciclo de vida da produção dos itens de um pedido. Ele garante que a cozinha tenha visibilidade do que precisa ser preparado e permite o controle de status até a entrega.
 
