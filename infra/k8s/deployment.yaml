@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: production-manager
+  namespace: production
+  labels:
+    app: production-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: production-manager
+  template:
+    metadata:
+      labels:
+        app: production-manager
+    spec:
+      containers:
+        - name: production-manager
+          image: IMAGE_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          envFrom:
+            - configMapRef:
+                name: production-manager-config
+            - secretRef:
+                name: production-manager-secret
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
