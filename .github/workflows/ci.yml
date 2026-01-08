@@ -146,7 +146,6 @@ jobs:
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-          aws eks get-token --cluster-name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} | head -n 5
 
       - name: Deploy to EKS and verify deployment
         env:
@@ -164,6 +163,9 @@ jobs:
           # Substitute secrets in secret.yaml
           # We use envsubst to replace ${VAR} with environment variable values
           envsubst < infra/k8s/secret.yaml > infra/k8s/secret-filled.yaml
+
+          # Ensure namespace exists
+          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f - --validate=false
 
           # Deploy application resources in order
           kubectl apply -f infra/k8s/configmap.yaml --validate=false
