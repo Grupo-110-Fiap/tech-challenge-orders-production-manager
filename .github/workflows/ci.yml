@@ -145,6 +145,7 @@ jobs:
 
       - name: Update kubeconfig
         run: |
+          aws sts get-caller-identity
           aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
       - name: Deploy to EKS and verify deployment
