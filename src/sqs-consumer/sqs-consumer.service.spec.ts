@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SqsConsumerService } from './sqs-consumer.service';
 import { ProductionService } from '../production/production.service';
+import { SqsMessageMapper } from './sqs-message.mapper';
 import { ConfigService } from '@nestjs/config';
 import {
   SQSClient,
@@ -12,6 +13,7 @@ import { mockClient } from 'aws-sdk-client-mock';
 describe('SqsConsumerService', () => {
   let service: SqsConsumerService;
   let productionService: ProductionService;
+  let messageMapper: SqsMessageMapper;
   const sqsMock = mockClient(SQSClient);
 
   beforeEach(async () => {
@@ -38,11 +40,18 @@ describe('SqsConsumerService', () => {
             receiveOrder: jest.fn(),
           },
         },
+        {
+          provide: SqsMessageMapper,
+          useValue: {
+            mapToDto: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<SqsConsumerService>(SqsConsumerService);
     productionService = module.get<ProductionService>(ProductionService);
+    messageMapper = module.get<SqsMessageMapper>(SqsMessageMapper);
   });
 
   it('should be defined', () => {
@@ -61,21 +70,19 @@ describe('SqsConsumerService', () => {
         Body: messageBody,
       };
 
-      // Mock SQS receive (though handleMessage is private, we can test logic via a "simulated" call if we want,
-      // or we can test private method by casting to any)
-      // For better testing, let's expose handleMessage as public for testing or invoke it via pollMessages logic.
-      // But invoking pollMessages involves an infinite loop which is hard to test.
-      // Best approach for unit testing logic: Call the private method directly (using any)
+      const expectedDto = {
+        externalOrderId: '550e8400-e29b-41d4-a716-446655440000',
+        items: [{ product_id: 'prod_abc', quantity: 2, price: 50.00 }],
+      };
 
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue(expectedDto);
       sqsMock.on(DeleteMessageCommand).resolves({});
       (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
 
       await (service as any).handleMessage(message);
 
-      expect(productionService.receiveOrder).toHaveBeenCalledWith({
-        externalOrderId: '550e8400-e29b-41d4-a716-446655440000',
-        items: [{ product_id: 'prod_abc', quantity: 2, price: 50.00 }],
-      });
+      expect(messageMapper.mapToDto).toHaveBeenCalledWith(messageBody);
+      expect(productionService.receiveOrder).toHaveBeenCalledWith(expectedDto);
 
       expect(sqsMock.calls()).toHaveLength(1);
       const deleteCommand = sqsMock.call(0).args[0] as DeleteMessageCommand;
@@ -99,15 +106,18 @@ describe('SqsConsumerService', () => {
         Body: body,
       };
 
+      const expectedDto = {
+        externalOrderId: 'ORDER-SNS',
+        items: [{ product_id: 'pizza_123', quantity: 2, price: 30.00 }],
+      };
+
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue(expectedDto);
       sqsMock.on(DeleteMessageCommand).resolves({});
       (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
 
       await (service as any).handleMessage(message);
 
-      expect(productionService.receiveOrder).toHaveBeenCalledWith({
-        externalOrderId: 'ORDER-SNS',
-        items: [{ product_id: 'pizza_123', quantity: 2, price: 30.00 }],
-      });
+      expect(productionService.receiveOrder).toHaveBeenCalledWith(expectedDto);
 
       expect(sqsMock.calls()).toHaveLength(1); // Delete called
     });
@@ -132,6 +142,7 @@ describe('SqsConsumerService', () => {
         Body: JSON.stringify({ externalOrderId: 'FAIL' }),
       };
 
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue({ externalOrderId: 'FAIL' });
       (productionService.receiveOrder as jest.Mock).mockRejectedValue(new Error('DB Error'));
 
       await (service as any).handleMessage(message);
@@ -154,32 +165,27 @@ describe('SqsConsumerService', () => {
       expect(productionService.receiveOrder).not.toHaveBeenCalled();
     });
 
-    it('should use payload.Message as DTO if it is not a JSON string (SNS raw)', async () => {
-      const innerMessageObj = {
-        id: 'ORDER-RAW',
+    it('should use payload.Message as DTO via mapper', async () => {
+      const messageBody = 'RAW MESSAGE';
+      const message = {
+        MessageId: 'msg-raw',
+        ReceiptHandle: 'handle-raw',
+        Body: messageBody,
+      };
+
+      const expectedDto = {
+        externalOrderId: 'ORDER-RAW',
         items: [{ product_id: 'fries_1', quantity: 1, price: 10.00 }],
       };
-      // Payload.Message is an object, not a string
-      const body = JSON.stringify({
-        Type: 'Notification',
-        Message: innerMessageObj,
-      });
 
-      const message = {
-        MessageId: 'msg-raw-sns',
-        ReceiptHandle: 'handle-raw-sns',
-        Body: body,
-      };
-
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue(expectedDto);
       sqsMock.on(DeleteMessageCommand).resolves({});
       (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
 
       await (service as any).handleMessage(message);
 
-      expect(productionService.receiveOrder).toHaveBeenCalledWith({
-        externalOrderId: 'ORDER-RAW',
-        items: [{ product_id: 'fries_1', quantity: 1, price: 10.00 }],
-      });
+      expect(messageMapper.mapToDto).toHaveBeenCalledWith(messageBody);
+      expect(productionService.receiveOrder).toHaveBeenCalledWith(expectedDto);
       expect(sqsMock.calls()).toHaveLength(1);
     });
   });
@@ -196,6 +202,7 @@ describe('SqsConsumerService', () => {
             },
           },
           { provide: ProductionService, useValue: { receiveOrder: jest.fn() } },
+          { provide: SqsMessageMapper, useValue: { mapToDto: jest.fn() } },
         ],
       }).compile();
 
@@ -228,6 +235,10 @@ describe('SqsConsumerService', () => {
 
       sqsMock.on(DeleteMessageCommand).resolves({});
       (productionService.receiveOrder as jest.Mock).mockResolvedValue({});
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue({
+        externalOrderId: 'POLL',
+        items: [],
+      });
 
       // Start
       service.onModuleInit();
@@ -259,6 +270,10 @@ describe('SqsConsumerService', () => {
         return { Messages: [] };
       });
 
+      (messageMapper.mapToDto as jest.Mock).mockReturnValue({
+        externalOrderId: 'ERROR',
+        items: [],
+      });
       const pollPromise = service.onModuleInit(); // Starts loop
 
       // Advance timers to cover the "wait after error" (5000ms)
